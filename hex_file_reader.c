@@ -47,106 +47,126 @@ typedef struct
     recordType_t recordType;
 }hexRecord_t;
 
+typedef enum
+{
+    FALSE = 0,
+    TRUE
+}bool_t;
+
 
 void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 uint8_t calcCrc(char *data);
 void getByteValue(char *dataChar, uint8_t *dataUint);
 uint8_t charTouint8t(char c);
-void readHexFileLine(FILE *hexFileBuf, uint32_t lineSize, char **datBuf);
-uint32_t countFileLines(FILE *hexFileBuf);
-
+void readHexFileLine(uint32_t lineSize, char **datBuf, char *hexFileName);
+uint32_t countFileLines(char *fileName);
 char **memReserve(uint32_t raw, uint32_t col);
+void MemRelease(char **buffer, uint32_t col);
+
 
 int main(void)
 {
-
-    FILE *hexFile;
     char *fileName = "Input_file/PC550_STM32.hex";
-
     char fileData[FILE_SIZE] = {0};
+    
     //size_t cnt = 0;
-    hexFile = fopen(fileName, "r");  
-     
-    if(hexFile == NULL)
-    {
-        printf("Can't open the file\n");
-    }
-    else
-    {
-        /*
-        char c = '0';
-        uint32_t i = 0;
-        do
-        {
-            c = (char)fgetc(hexFile);
-            fileData[i] = c; 
-            i++;
-        }
-        while((i < 16));
-        */
+    uint32_t fileLines = 0;
+    
 
-        uint32_t fileLines = 0;
-        fileLines = countFileLines(hexFile);
+    fileLines = countFileLines(fileName);
+        
+    char **hexData;
+    hexData = memReserve(fileLines, HEX_FILE_MAX_COL);
 
+    readHexFileLine(fileLines, hexData, fileName);
 
-        char **hexData = memReserve(fileLines, HEX_FILE_MAX_COL);
+    uint8_t dataUint[16] = {0};
+    getByteValue(fileData, dataUint);
 
-        readHexFileLine(hexFile, fileLines, hexData);
-
-        uint8_t dataUint[16] = {0};
-        getByteValue(fileData, dataUint);
-
-        fclose(hexFile);
-    }
+    MemRelease(hexData, HEX_FILE_MAX_COL);    
     return 0;
 }
 
 char **memReserve(uint32_t raw, uint32_t col)
 {
+    uint32_t i;
     char **buffer;
-    buffer = (char**)calloc(raw, sizeof(char));
-    for(uint32_t i = 0; i < col; i++)
-    {
-        buffer[i] = (char*)calloc(col, sizeof(char));
-    }
 
+    buffer = (char **)malloc(sizeof(char *) * raw);
+
+    for(i = 0; i < raw; i++)
+    {
+        buffer[i] = (char *)malloc(sizeof(char) * col);
+        memset(buffer[i], 0, (sizeof(char) * col));
+    }
     return buffer;
 }
 
+void MemRelease(char **buffer, uint32_t col)
+{
+    for(uint32_t i = 0; i < col; i++)
+    {
+       free(buffer[i]);
+    }
+    free(buffer);
+}
 
-uint32_t countFileLines(FILE *hexFileBuf)
+
+uint32_t countFileLines(char *fileName)
 {
     uint32_t retVal = 0;
+    FILE *file;
     char c = '0';
-    do
-    {
-        c = (char)fgetc(hexFileBuf);
-        if(c == '\n')
+
+    file = fopen(fileName, "r");
+    if(NULL != file)
+    {       
+        do
         {
-            retVal++;
-        }
-    } while (c != EOF);
-    
+            c = (char)fgetc(file);
+            if(c == '\n')
+            {
+                retVal++;
+            }
+        } while (c != EOF);
+        fclose(file);
+    }
+    else
+    {
+        printf("Can't open the file\n");
+    }    
     return retVal;
 }
 
 
-void readHexFileLine(FILE *hexFileBuf, uint32_t lineSize, char **datBuf)
+//":10B00000C037002081B2000839120108AB0C0108DA\n��������"
+
+void readHexFileLine(uint32_t lineSize, char **datBuf, char *hexFileName)
 {
     char c = '0';
+    FILE *hexFile;
 
-    for(uint16_t i = 0; i < lineSize; i++)
+    hexFile = fopen(hexFileName, "r");
+    if(NULL != hexFile)
     {
-        for(uint16_t j = 0; j < HEX_FILE_MAX_COL; j++)
+        for(uint32_t i = 0; i < lineSize; i++)
         {
-            c = (char)fgetc(hexFileBuf);
-            datBuf[i][j] = c;
-            if(c == '\n')
+            for(uint32_t j = 0; j < HEX_FILE_MAX_COL; j++)
             {
-                break;
+                c = (char)fgetc(hexFile);
+                datBuf[i][j] = c;
+                if(c == '\n')
+                {
+                    break;
+                }
             }
+            printf("%s", datBuf[i]);
         }
-        printf("%s", datBuf[i]);
+        fclose(hexFile);
+    }
+    else
+    {
+        printf("Can't open the file\n");
     }
 }
 
