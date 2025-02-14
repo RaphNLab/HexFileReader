@@ -60,6 +60,11 @@ typedef struct
 /*
 * @brief extract section address
 */
+void eveluateFile(char *hexFileName);
+
+/*
+* @brief extract section address
+*/
 void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 
 /*
@@ -67,28 +72,24 @@ void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 * @param hexChar : buffer containing all characters
 * @retval uint8_t *
 */
-uint8_t *getByteValue(char *hexChar);
+static uint8_t *getByteValue(char *hexChar);
 
 /*
 * @brief Convert single character to byte value
 * @param C : charracter to convert
 * @retval uint8_t
 */
-uint8_t charTouint8(char c);
+static uint8_t charTouint8(char c);
 
 /*
 * @brief extract section address
 */
-void readHexFileLine(uint32_t lineSize, char **datBuf, char *hexFileName);
+static void readHexFileLine(FILE *hexFile, char *datBuf);
+
 
 /*
 * @brief extract section address
 */
-uint32_t countFileLines(char *fileName);
-
-/*
-* @brief extract section address
-*/
-void parseHexRecord(char *hexChar, hexRecord_t *record);
+static void parseHexRecord(char *hexChar, hexRecord_t *record);
 
 #endif

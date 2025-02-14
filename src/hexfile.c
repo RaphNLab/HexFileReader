@@ -1,70 +1,54 @@
 #include "include/hexfile.h"
 
 
-uint32_t countFileLines(char *fileName)
+void eveluateFile(char *hexFileName)
 {
-    uint32_t retVal = 0;
-    FILE *file;
-    char c = '0';
-
-    file = fopen(fileName, "r");
-    if(NULL != file)
-    {       
-        do
-        {
-            c = (char)fgetc(file);
-            if(c == '\n')
-            {
-                retVal++;
-            }
-        } while (c != EOF);
-        fclose(file);
-    }
-    else
-    {
-        printf("Can't open the file\n");
-    }    
-    return retVal;
-}
-
-
-//":10B00000C037002081B2000839120108AB0C0108DA\n��������"
-
-void readHexFileLine(uint32_t lineSize, char **datBuf, char *hexFileName)
-{
-    char c = '0';
     FILE *hexFile;
+    char *hexBuffer[HEX_FILE_MAX_COL];
+    hexRecord_t record;
 
     hexFile = fopen(hexFileName, "r");
     if(NULL != hexFile)
     {
-        for(uint32_t i = 0; i < lineSize; i++)
+        do
         {
-            for(uint32_t j = 0; j < HEX_FILE_MAX_COL; j++)
-            {
-                c = (char)fgetc(hexFile);
-                datBuf[i][j] = c;
-                if(c == '\n')
-                {
-                    datBuf[i][j] = 0;
-                    break;
-                }
-            }
-            printf("%s", datBuf[i]);
-        }
-        fclose(hexFile);
+            // Read each line 
+            readHexFileLine(hexFile, hexBuffer);
+            // Parse every Record
+            parseHexRecord(hexBuffer, &record);
+        } while (record.recordType != EOF_RECORD);
     }
     else
     {
         printf("Can't open the file\n");
     }
+
+    fclose(hexFile);
 }
 
-uint8_t *getByteValue(char *hexChar)
+
+static void readHexFileLine(FILE *hexFile, char *datBuf)
+{
+    char c = '0';
+    FILE *hexFile;
+
+    for(uint32_t i = 0; i < HEX_FILE_MAX_COL; i++)
+    {
+        c = (char)fgetc(hexFile);
+        datBuf[i] = c;
+        if(c == '\n')
+        {
+            datBuf[i] = 0;
+            break;
+        }
+    }
+}
+
+static uint8_t *getByteValue(char *hexChar)
 {
     uint8_t i = 0;
     size_t size = strlen(hexChar);
-    uint8_t hexUint[size];
+    uint8_t hexUint[HEX_FILE_MAX_COL];
 
     for(i = 0; i < size; i++)
     {
@@ -77,7 +61,7 @@ uint8_t *getByteValue(char *hexChar)
 }
 
 
-void parseHexRecord(char *hexChar, hexRecord_t *record)
+static void parseHexRecord(char *hexChar, hexRecord_t *record)
 {
     uint8_t *hexUint;
     uint8_t i;
@@ -103,7 +87,7 @@ void parseHexRecord(char *hexChar, hexRecord_t *record)
 }
 
 
-uint8_t charTouint8(char c)
+static uint8_t charTouint8(char c)
 {
     uint8_t retVal = 0;;
 
@@ -148,7 +132,7 @@ uint8_t charTouint8(char c)
 }
 
 
-void retreiveSegtionAddr(char *hexFile, uint32_t *addr)
+static void retreiveSegtionAddr(char *hexFile, uint32_t *addr)
 {
     /* :020000040800F2 
        :020000040801F1
