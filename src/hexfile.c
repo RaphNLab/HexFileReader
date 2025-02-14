@@ -1,10 +1,38 @@
-#include "include/hexfile.h"
+#include "hexfile.h"
+#include "memory.h"
+
+
+/*
+* @brief convert each char to byte and return byte buffer
+* @param hexChar : buffer containing all characters
+* @retval uint8_t *
+*/
+static void getByteValue(char *hexChar, uint8_t *hexUint);
+
+/*
+* @brief Convert single character to byte value
+* @param C : charracter to convert
+* @retval uint8_t
+*/
+static uint8_t charTouint8(char c);
+
+/*
+* @brief extract section address
+*/
+static void readHexFileLine(FILE *hexFile, char *datBuf);
+
+
+/*
+* @brief extract section address
+*/
+static void parseHexRecord(char *hexChar, hexRecord_t *record);
+
 
 
 void eveluateFile(char *hexFileName)
 {
     FILE *hexFile;
-    char *hexBuffer[HEX_FILE_MAX_COL];
+    char hexBuffer[HEX_FILE_MAX_COL] = {0};
     hexRecord_t record;
 
     hexFile = fopen(hexFileName, "r");
@@ -14,6 +42,9 @@ void eveluateFile(char *hexFileName)
         {
             // Read each line 
             readHexFileLine(hexFile, hexBuffer);
+
+            printf("%s", hexBuffer);
+
             // Parse every Record
             parseHexRecord(hexBuffer, &record);
         } while (record.recordType != EOF_RECORD);
@@ -27,12 +58,13 @@ void eveluateFile(char *hexFileName)
 }
 
 
+// C037002081B2000839120108AB0C0108
+
 static void readHexFileLine(FILE *hexFile, char *datBuf)
 {
     char c = '0';
-    FILE *hexFile;
 
-    for(uint32_t i = 0; i < HEX_FILE_MAX_COL; i++)
+    for(uint8_t i = 0; i < HEX_FILE_MAX_COL; i++)
     {
         c = (char)fgetc(hexFile);
         datBuf[i] = c;
@@ -44,11 +76,10 @@ static void readHexFileLine(FILE *hexFile, char *datBuf)
     }
 }
 
-static uint8_t *getByteValue(char *hexChar)
+static void getByteValue(char *hexChar, uint8_t *hexUint)
 {
-    uint8_t i = 0;
+    uint8_t i;
     size_t size = strlen(hexChar);
-    uint8_t hexUint[HEX_FILE_MAX_COL];
 
     for(i = 0; i < size; i++)
     {
@@ -57,27 +88,27 @@ static uint8_t *getByteValue(char *hexChar)
             hexUint[i] = charTouint8(hexChar[i]);
         }
     }
-    return hexUint;
 }
 
 
 static void parseHexRecord(char *hexChar, hexRecord_t *record)
 {
-    uint8_t *hexUint;
-    uint8_t i;
-    if(hexChar[0] != ':')
-    {
-        hexUint = getByteValue(hexChar);
+    uint8_t hexUint[HEX_FILE_MAX_COL] = {0};
+    uint8_t i, j;
 
-        record->startCode = hexUint[0];
+    if(hexChar[0] == ':')
+    {
+        getByteValue(hexChar, hexUint);
+
+        record->startCode = hexChar[0];
         record->byteSize = memory_readbyte(hexUint, BYTE_SIZE_POS);
         record->lsbAddr = memory_readUint16(hexUint, LSB_ADDR_POS);
         record->recordType = memory_readbyte(hexUint, RECORD_TYPE_POS);
-        record->crc =  memory_readbyte(hexUint, (DATA_POS + record->byteSize));
+        record->crc =  memory_readbyte(hexUint, (uint8_t)(DATA_POS + (record->byteSize * 2)));
 
-        for (i = 0; i < record->byteSize; i++)
+        for (i = 0, j = 0; i < (record->byteSize * 2); i += 2, j++)
         {
-          record->data[i] =  memory_readbyte(hexUint, (DATA_POS + i));
+          record->data[j] =  memory_readbyte(hexUint, (uint8_t)(DATA_POS + i));
         }
     }
     else
@@ -124,18 +155,12 @@ static uint8_t charTouint8(char c)
             case 'F':
                 retVal = 15;
             break;
+            case ':':
+                retVal = 58;
+            break;
             default:
                 break;
         }
     }
     return retVal;
-}
-
-
-static void retreiveSegtionAddr(char *hexFile, uint32_t *addr)
-{
-    /* :020000040800F2 
-       :020000040801F1
-    */
-
 }

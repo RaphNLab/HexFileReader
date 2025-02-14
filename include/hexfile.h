@@ -1,7 +1,7 @@
 #ifndef HEXFILE_H_
 #define HEXFILE_H_
 
-#include "include/global.h"
+#include "global.h"
 
 
 #define MAX_RECORD_SIZE     0x10U
@@ -67,29 +67,5 @@ void eveluateFile(char *hexFileName);
 */
 void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 
-/*
-* @brief convert each char to byte and return byte buffer
-* @param hexChar : buffer containing all characters
-* @retval uint8_t *
-*/
-static uint8_t *getByteValue(char *hexChar);
-
-/*
-* @brief Convert single character to byte value
-* @param C : charracter to convert
-* @retval uint8_t
-*/
-static uint8_t charTouint8(char c);
-
-/*
-* @brief extract section address
-*/
-static void readHexFileLine(FILE *hexFile, char *datBuf);
-
-
-/*
-* @brief extract section address
-*/
-static void parseHexRecord(char *hexChar, hexRecord_t *record);
 
 #endif

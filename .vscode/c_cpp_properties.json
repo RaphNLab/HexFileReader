@@ -1,18 +1,37 @@
 {
+  "env": {
+    "myIncludePath": [
+      "${workspaceFolder}\\include",
+      "${workspaceFolder}\\src"
+    ],
+    "myDefines": [
+      "DEBUG",
+      "MY_FEATURE=1"
+    ]
+  },
   "configurations": [
     {
-      "name": "linux-gcc-x64",
+      "name": "windows-gcc-x86",
+      "compilerPath": "C:/MinGW/bin/gcc.exe",
+      "intelliSenseMode": "windows-gcc-x86",
       "includePath": [
-        "${workspaceFolder}/**"
+        "${workspaceFolder}/**",
+        "${workspaceFolder}\\include"
       ],
-      "compilerPath": "/usr/bin/gcc",
+      "defines": [
+        "${myDefines}",
+        "_WINDOWS"
+      ],
       "cStandard": "${default}",
       "cppStandard": "${default}",
-      "intelliSenseMode": "linux-gcc-x64",
-      "compilerArgs": [
-        ""
-      ]
+      "browse": {
+        "path": [
+          "${myIncludePath}",
+          "${workspaceFolder}"
+        ]
+      }
     }
   ],
-  "version": 4
+  "version": 4,
+  "enableConfigurationSquiggles": true
 }
