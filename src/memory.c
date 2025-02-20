@@ -39,8 +39,8 @@ uint8_t memory_readbyte(uint8_t *buf, uint8_t index)
 {
     uint8_t retVal = 0;
     
-	retVal = (uint8_t)((buf[index] << 4) & MY_BYTE_MASK);
-    retVal |= (uint8_t)(buf[index + 1] & MY_BYTE_MASK);
+	retVal = (uint8_t)((buf[index] << 4) & (uint8_t)MY_BYTE_MASK);
+    retVal |= (uint8_t)(buf[index + 1] & (uint8_t)MY_BYTE_MASK);
     
     return retVal;
 }

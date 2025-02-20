@@ -18,6 +18,7 @@
 #define RENESAS_MCU         1U
 #define STM32_MCU           0U
 
+
 #if RENESAS_MCU
 #define MIN_FLASH_ADDR      0xFFF00000U
 #define MAX_FLASH_ADDR      0xFFFFFFFFU
@@ -43,6 +44,19 @@ typedef enum
 }recordType_t;
 
 
+typedef enum
+{
+    HEXFILE_ERROR = 0,
+    HEXFILE_OK,
+    HEXFILE_EOF,
+    HEXFILE_CRC_ERROR,
+    HEXFILE_DATA_RECORD_EVAL_OK,
+    HEXFILE_LIN_ADDR_MSB,
+    HEXFILE_OPTION_SETTING_MEM,
+    HEXFILE_NO_OPTION_SETTING_MEM,
+    HEXFILE_UNDEFINED_RECORD
+}hexErrorCode_t;
+
 /*
 * @brief extract section address
 */
@@ -57,6 +71,10 @@ typedef struct
 }hexRecord_t;
 
 
+extern uint32_t fileSize;
+extern uint32_t firmwaresize;
+extern uint8_t *hexFileDataBuf;
+
 /*
 * @brief extract section address
 */
@@ -67,5 +85,8 @@ void eveluateFile(char *hexFileName);
 */
 void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 
+void storeFirmwareToTable(uint8_t *FirmwareBuf, char *file_name, uint32_t size);
+
+uint32_t countFileLines(char *fileName);
 
 #endif

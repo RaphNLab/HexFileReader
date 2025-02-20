@@ -2,6 +2,17 @@
 #include "memory.h"
 
 
+uint32_t segmentAddrMsb = 0U;
+uint32_t segmentAddrLsb = 0U;
+uint8_t segment_section_amount = 0U;
+bool_t firstDataRecord = FALSE;
+bool_t optionSettingMemFound = FALSE;
+uint32_t hexfilestartAddr = 0U;
+uint32_t hexfilestopAddr = 0U;
+
+uint8_t *hexFileDataBuf;
+uint32_t fileSize = 0;
+uint32_t firmwaresize = 0;
 /*
 * @brief convert each char to byte and return byte buffer
 * @param hexChar : buffer containing all characters
@@ -25,8 +36,9 @@ static void readHexFileLine(FILE *hexFile, char *datBuf);
 /*
 * @brief extract section address
 */
-static void parseHexRecord(char *hexChar, hexRecord_t *record);
+static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record);
 
+static hexErrorCode_t evalRecord(hexRecord_t *record);
 
 
 void eveluateFile(char *hexFileName)
@@ -34,6 +46,10 @@ void eveluateFile(char *hexFileName)
     FILE *hexFile;
     char hexBuffer[HEX_FILE_MAX_COL] = {0};
     hexRecord_t record;
+    hexErrorCode_t parseOk = HEXFILE_ERROR;
+    hexErrorCode_t evalRecordOk = HEXFILE_ERROR;
+
+    uint32_t writeIdx = 0;
 
     hexFile = fopen(hexFileName, "r");
     if(NULL != hexFile)
@@ -43,20 +59,51 @@ void eveluateFile(char *hexFileName)
             // Read each line 
             readHexFileLine(hexFile, hexBuffer);
 
-            printf("%s", hexBuffer);
+            //printf("%s", hexBuffer);
 
             // Parse every Record
-            parseHexRecord(hexBuffer, &record);
+            parseOk = parseHexRecord(hexBuffer, &record);
+
+            if(parseOk == HEXFILE_OK)
+            {
+                evalRecordOk = evalRecord(&record);
+                
+                if((evalRecordOk == HEXFILE_DATA_RECORD_EVAL_OK) && !optionSettingMemFound)
+                {
+                	uint8_t i;
+					uint8_t len = (uint8_t)record.byteSize;
+                	for(i = 0; i < len; i++)
+					{
+						// TODO:
+						// - Store the firmware data
+						hexFileDataBuf[writeIdx] = record.data[i];
+						writeIdx++;
+					}
+                }
+                if((evalRecordOk = HEXFILE_LIN_ADDR_MSB) || (evalRecordOk == HEXFILE_OPTION_SETTING_MEM))
+                {
+                    continue;
+                }
+            }
+            else if(parseOk == HEXFILE_CRC_ERROR)
+            {
+                printf("ERROR: Wrong CRC\n");
+            }
+            else
+            {
+                printf("ERROR: Unable to parse hex record\n");
+            }
         } while (record.recordType != EOF_RECORD);
+        // Notice how much data was written
+        firmwaresize = writeIdx;
     }
     else
     {
-        printf("Can't open the file\n");
+        printf("ERROR: Can't open the file\n");
     }
 
     fclose(hexFile);
 }
-
 
 // C037002081B2000839120108AB0C0108
 
@@ -91,10 +138,12 @@ static void getByteValue(char *hexChar, uint8_t *hexUint)
 }
 
 
-static void parseHexRecord(char *hexChar, hexRecord_t *record)
+static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record)
 {
     uint8_t hexUint[HEX_FILE_MAX_COL] = {0};
     uint8_t i, j;
+    hexErrorCode_t retVal = FALSE;
+    uint8_t calcCrc = 0;
 
     if(hexChar[0] == ':')
     {
@@ -104,17 +153,110 @@ static void parseHexRecord(char *hexChar, hexRecord_t *record)
         record->byteSize = memory_readbyte(hexUint, BYTE_SIZE_POS);
         record->lsbAddr = memory_readUint16(hexUint, LSB_ADDR_POS);
         record->recordType = memory_readbyte(hexUint, RECORD_TYPE_POS);
-        record->crc =  memory_readbyte(hexUint, (uint8_t)(DATA_POS + (record->byteSize * 2)));
+        record->crc =  memory_readbyte(hexUint, (uint8_t)(DATA_POS + (uint8_t)(record->byteSize * 2)));
+
+        calcCrc = record->byteSize;
+        calcCrc += (uint8_t)((record->lsbAddr >> 8) & BYTE_MASK) + (uint8_t)(record->lsbAddr & BYTE_MASK);
+        calcCrc += (uint8_t)record->recordType + (uint8_t)record->crc;
 
         for (i = 0, j = 0; i < (record->byteSize * 2); i += 2, j++)
         {
           record->data[j] =  memory_readbyte(hexUint, (uint8_t)(DATA_POS + i));
+          calcCrc += record->data[j];
         }
+
+        if(calcCrc != 0)
+        {
+            retVal = HEXFILE_CRC_ERROR;
+        }
+        retVal = HEXFILE_OK;
     }
     else
     {
         printf("Wrong data Record");
     }
+    return retVal;
+}
+
+
+static hexErrorCode_t evalRecord(hexRecord_t *record)
+{
+    hexErrorCode_t retVal = HEXFILE_ERROR;
+
+    switch (record->recordType)
+    {
+    case DATA_RECORD:
+    {
+        /* Handle data record */
+
+        /* Find a correct way to save hex data*/
+        uint32_t addr = 0;
+        segmentAddrLsb = record->lsbAddr;
+        addr = (uint32_t)(segmentAddrMsb | segmentAddrLsb);
+
+        if(addr == OPTION_SETTING_MEM)
+        {
+            // Jump to the next section record
+            optionSettingMemFound = TRUE;
+            retVal = HEXFILE_OPTION_SETTING_MEM;
+        }
+        else
+        {
+        	/* Handle only if record != option setting */
+        	if(!optionSettingMemFound)
+        	{
+				if(!firstDataRecord)
+				{
+					// Store the start address
+					hexfilestartAddr = addr;
+					firstDataRecord = TRUE;
+				}
+        	}
+            retVal = HEXFILE_DATA_RECORD_EVAL_OK;
+        }
+    }
+        break;
+    case EOF_RECORD:
+        /* Handle end of file record */
+        retVal = HEXFILE_EOF;
+        break;
+    case EXT_SEG_ADDR_RECORD:
+    {
+        /* Handle extended segment address record */
+        /* Store segment address MSB*/
+        uint32_t segAddrMsb = (uint32_t)record->data[0] << 8 | record->data[1];
+        segmentAddrMsb = segAddrMsb << 8;
+    } 
+        break;
+    case START_SEG_ADDR_RECORD:
+        /* Handle start segment address record */
+        break;
+    case EXT_LIN_ADDR_RECORD:
+    {
+        /* Handle Linear segment address record */
+        /* Store segment address MSB*/
+    	segmentAddrMsb = (uint32_t)(record->data[0] << 24) | (record->data[1] << 16);
+
+        if(optionSettingMemFound)
+        {
+            optionSettingMemFound = FALSE;
+        }
+        retVal = HEXFILE_LIN_ADDR_MSB;
+    } 
+        break;
+    case START_LIN_ADDR_RECORD:
+    {
+        /* Handle start linear address record */
+        /* Store segment address MSB*/
+    	segmentAddrMsb = (uint32_t)(record->data[0] << 24) | (record->data[1] << 16);
+    }
+        break;
+    default:
+        retVal = HEXFILE_UNDEFINED_RECORD;
+        break;
+    }
+
+    return retVal;
 }
 
 
@@ -164,3 +306,65 @@ static uint8_t charTouint8(char c)
     }
     return retVal;
 }
+
+
+uint32_t countFileLines(char *fileName)
+{
+    uint32_t retVal = 0;
+    FILE *file;
+    char c = '0';
+
+    file = fopen(fileName, "r");
+    if(NULL != file)
+    {       
+        do
+        {
+            c = (char)fgetc(file);
+            if(c == '\n')
+            {
+                retVal++;
+            }
+        } while (c != EOF);
+        fclose(file);
+    }
+    else
+    {
+        printf("ERROR: Can't open the file\n");
+    }    
+    return retVal;
+}
+
+
+
+void storeFirmwareToTable(uint8_t *FirmwareBuf, char *file_name, uint32_t size)
+{
+    FILE *file;
+    uint32_t i;
+    file = fopen(file_name, "w");
+    
+    if(NULL != file)
+    {       
+        for(i = 0; i < size; i++)
+        {  
+            if((i % 16) == 0)
+            {
+                fprintf(file, "\n");
+            }
+            fprintf(file, "0x%X, ", FirmwareBuf[i]);
+        }
+    }
+    else
+    {
+        printf("ERROR: Can't open the file\n");
+    }
+
+    fclose(file);
+}
+
+
+
+
+
+
+
+
