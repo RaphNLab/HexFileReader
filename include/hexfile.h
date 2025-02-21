@@ -5,7 +5,7 @@
 
 
 #define MAX_RECORD_SIZE     0x10U
-#define HEX_FILE_MAX_COL    44U
+#define HEX_FILE_MAX_COL    524U
 #define FILE_SIZE           0x800U
 #define END_CHAR            '\n'
 
@@ -64,7 +64,7 @@ typedef struct
 {
     char startCode;
     uint8_t byteSize;
-    uint8_t data[16];
+    uint8_t data[HEX_FILE_MAX_COL];
     uint8_t crc;
     uint16_t lsbAddr;
     recordType_t recordType;
@@ -85,7 +85,7 @@ void eveluateFile(char *hexFileName);
 */
 void retreiveSegtionAddr(char *hexFile, uint32_t *addr);
 
-void storeFirmwareToTable(uint8_t *FirmwareBuf, char *file_name, uint32_t size);
+void storeFirmwareToTable(uint8_t *FirmwareBuf, char *fileName, uint32_t size);
 
 uint32_t countFileLines(char *fileName);
 

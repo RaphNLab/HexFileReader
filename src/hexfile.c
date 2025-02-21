@@ -1,5 +1,8 @@
 #include "hexfile.h"
 #include "memory.h"
+#include "menu.h"
+#include <time.h>
+
 
 
 uint32_t segmentAddrMsb = 0U;
@@ -13,6 +16,8 @@ uint32_t hexfilestopAddr = 0U;
 uint8_t *hexFileDataBuf;
 uint32_t fileSize = 0;
 uint32_t firmwaresize = 0;
+
+
 /*
 * @brief convert each char to byte and return byte buffer
 * @param hexChar : buffer containing all characters
@@ -28,16 +33,27 @@ static void getByteValue(char *hexChar, uint8_t *hexUint);
 static uint8_t charTouint8(char c);
 
 /*
-* @brief extract section address
+* @brief Read the file one line after the other
+* @param hexFile FILE*, Pointer to the file to read
+* @param datBuf char*, buffer to store the line to read
+* @retval void
 */
 static void readHexFileLine(FILE *hexFile, char *datBuf);
 
 
 /*
-* @brief extract section address
+* @brief Parse hexfile char into hex record
+* @param hexChar char*, buffer containing hex file line
+* @param record hexRecord_t, record struct
+* @retval void
 */
 static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record);
 
+/**
+ * @brief Evaluate data record
+ * @param record hexRecord_t, record struct
+ * @retval hexRecord_t
+ */
 static hexErrorCode_t evalRecord(hexRecord_t *record);
 
 
@@ -59,8 +75,6 @@ void eveluateFile(char *hexFileName)
             // Read each line 
             readHexFileLine(hexFile, hexBuffer);
 
-            //printf("%s", hexBuffer);
-
             // Parse every Record
             parseOk = parseHexRecord(hexBuffer, &record);
 
@@ -70,8 +84,8 @@ void eveluateFile(char *hexFileName)
                 
                 if((evalRecordOk == HEXFILE_DATA_RECORD_EVAL_OK) && !optionSettingMemFound)
                 {
-                	uint8_t i;
-					uint8_t len = (uint8_t)record.byteSize;
+                	uint16_t i;
+					uint16_t len = (uint8_t)record.byteSize;
                 	for(i = 0; i < len; i++)
 					{
 						// TODO:
@@ -99,7 +113,9 @@ void eveluateFile(char *hexFileName)
     }
     else
     {
-        printf("ERROR: Can't open the file\n");
+        printf("ERROR: Can't open the file\n"
+               "ERROR: No such file or directory\n"
+        );
     }
 
     fclose(hexFile);
@@ -107,25 +123,36 @@ void eveluateFile(char *hexFileName)
 
 // C037002081B2000839120108AB0C0108
 
-static void readHexFileLine(FILE *hexFile, char *datBuf)
+static void readHexFileLine(FILE *hexFile, char *dataBuf)
 {
     char c = '0';
+    uint16_t i = 0;
 
-    for(uint8_t i = 0; i < HEX_FILE_MAX_COL; i++)
+    /*for(uint8_t i = 0; i < HEX_FILE_MAX_COL; i++)
     {
         c = (char)fgetc(hexFile);
-        datBuf[i] = c;
+        dataBuf[i] = c;
         if(c == '\n')
         {
-            datBuf[i] = 0;
+            dataBuf[i] = 0;
             break;
         }
-    }
+    }*/
+
+    do
+    {
+        c = (char)fgetc(hexFile);
+        dataBuf[i] = c;
+        i++;
+    } while (c != '\n');
+
+    dataBuf[i] = 0;
+    
 }
 
 static void getByteValue(char *hexChar, uint8_t *hexUint)
 {
-    uint8_t i;
+    uint16_t i;
     size_t size = strlen(hexChar);
 
     for(i = 0; i < size; i++)
@@ -141,7 +168,7 @@ static void getByteValue(char *hexChar, uint8_t *hexUint)
 static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record)
 {
     uint8_t hexUint[HEX_FILE_MAX_COL] = {0};
-    uint8_t i, j;
+    uint16_t i, j;
     hexErrorCode_t retVal = FALSE;
     uint8_t calcCrc = 0;
 
@@ -173,7 +200,7 @@ static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record)
     }
     else
     {
-        printf("Wrong data Record");
+        printf("Wrong data Record\n");
     }
     return retVal;
 }
@@ -329,33 +356,70 @@ uint32_t countFileLines(char *fileName)
     }
     else
     {
-        printf("ERROR: Can't open the file\n");
+        printf("ERROR: Can't open the file\n"
+               "ERROR: No such file or directory\n"
+        );
     }    
     return retVal;
 }
 
 
 
-void storeFirmwareToTable(uint8_t *FirmwareBuf, char *file_name, uint32_t size)
+void storeFirmwareToTable(uint8_t *FirmwareBuf, char *fileName, uint32_t size)
 {
     FILE *file;
     uint32_t i;
-    file = fopen(file_name, "w");
+    
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    file = fopen(fileName, "w");
+    char *header =  "\n\n"
+                    "const uint8_t firmwarebuf[] = \n"
+                    "{";
+
+    char *end = "\n};\n\n#endif /* INCLUDE_FIRMWARE_H_ */";
+
     
     if(NULL != file)
     {       
+        fprintf(file, "/*\n"
+                    "* firmware.h\n"
+                    "*\n"
+                    "*  Created on:"
+        );
+        fprintf(file, " %d.%d.%d\n", tm.tm_mday, (tm.tm_mon + 1), (tm.tm_year + 1900));
+        fprintf(file, "*      Author: silvere.sacker.ngouf\n"
+                      "*/\n"
+                      "#ifndef INCLUDE_FIRMWARE_H_\n"
+                      "#define INCLUDE_FIRMWARE_H_\n\n"
+        );
+
+        fprintf(file, "%s", header);
+
+
         for(i = 0; i < size; i++)
         {  
             if((i % 16) == 0)
             {
-                fprintf(file, "\n");
+                fprintf(file, "\n\t");
             }
-            fprintf(file, "0x%X, ", FirmwareBuf[i]);
+            fprintf(file, "0x%02X", FirmwareBuf[i]);
+
+            if(i != size -1)
+            {
+                fprintf(file, ", ");
+            }
         }
+        fprintf(file, "%s", end);
+
+        printSuccess(fileName);
     }
     else
     {
-        printf("ERROR: Can't open the file\n");
+        printf("ERROR: Can't open the file\n"
+               "ERROR: No such file or directory\n"
+        );
     }
 
     fclose(file);

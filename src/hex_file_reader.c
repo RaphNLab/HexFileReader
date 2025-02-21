@@ -1,20 +1,33 @@
 #include "hexfile.h"
+#include "menu.h"
 
 
-int main(void)
+int main(int argc, char *argv[])
 {
-    char *fileName = "C:\\Projekte\\hex_file_reader\\Input_File\\PC550_App.hex";
-    char *FirmwareFile = "C:\\Projekte\\hex_file_reader\\Output_File\\firmware.txt";
+    int retVal = 0;
+    char *fileName;
+    char *FirmwareFile;
 
-    fileSize = (countFileLines(fileName) * HEX_FILE_MAX_COL);
+    if(argc < 3)
+    {
+        printMenu();
+        retVal = -1;
+    }
+    else
+    {
+        fileName = argv[1];
+        FirmwareFile = argv[2];
+        fileSize = (countFileLines(fileName) * HEX_FILE_MAX_COL);
 
-    hexFileDataBuf = (uint8_t*)calloc(fileSize, sizeof(uint8_t*));
+        hexFileDataBuf = (uint8_t*)calloc(fileSize, sizeof(uint8_t*));
 
-    eveluateFile(fileName);
+        eveluateFile(fileName);
 
-    storeFirmwareToTable(hexFileDataBuf, FirmwareFile, firmwaresize);
+        storeFirmwareToTable(hexFileDataBuf, FirmwareFile, firmwaresize);
 
+        /* Free Dynamic  allocated memory */
+        free(hexFileDataBuf);
+    }
 
-    free(hexFileDataBuf);
-    return 0;
+    return retVal;
 }
