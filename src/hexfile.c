@@ -7,11 +7,8 @@
 
 uint32_t segmentAddrMsb = 0U;
 uint32_t segmentAddrLsb = 0U;
-uint8_t segment_section_amount = 0U;
 bool_t firstDataRecord = FALSE;
 bool_t optionSettingMemFound = FALSE;
-uint32_t hexfilestartAddr = 0U;
-uint32_t hexfilestopAddr = 0U;
 
 uint8_t *hexFileDataBuf;
 uint32_t fileSize = 0;
@@ -55,6 +52,13 @@ static hexErrorCode_t parseHexRecord(char *hexChar, hexRecord_t *record);
  * @retval hexRecord_t
  */
 static hexErrorCode_t evalRecord(hexRecord_t *record);
+
+
+/**
+ * @brief This function fills the resulting firmware buffer with 0xFF bytes if the last page is not 1Kb
+ * */
+static void complete_file(uint8_t *firmwareBuf, uint32_t actualSize);
+
 
 
 void eveluateFile(char *hexFileName)
@@ -109,7 +113,9 @@ void eveluateFile(char *hexFileName)
             }
         } while (record.recordType != EOF_RECORD);
         // Notice how much data was written
-        firmwaresize = writeIdx;
+        //firmwaresize = writeIdx;
+        // Complete the file and store the real firmware size
+        complete_file(hexFileDataBuf, writeIdx);
     }
     else
     {
@@ -121,23 +127,10 @@ void eveluateFile(char *hexFileName)
     fclose(hexFile);
 }
 
-// C037002081B2000839120108AB0C0108
-
 static void readHexFileLine(FILE *hexFile, char *dataBuf)
 {
     char c = '0';
     uint16_t i = 0;
-
-    /*for(uint8_t i = 0; i < HEX_FILE_MAX_COL; i++)
-    {
-        c = (char)fgetc(hexFile);
-        dataBuf[i] = c;
-        if(c == '\n')
-        {
-            dataBuf[i] = 0;
-            break;
-        }
-    }*/
 
     do
     {
@@ -235,7 +228,6 @@ static hexErrorCode_t evalRecord(hexRecord_t *record)
 				if(!firstDataRecord)
 				{
 					// Store the start address
-					hexfilestartAddr = addr;
 					firstDataRecord = TRUE;
 				}
         	}
@@ -364,6 +356,23 @@ uint32_t countFileLines(char *fileName)
 }
 
 
+/**
+ * @brief This function fills the resulting firmware buffer with 0xFF bytes if the last page is not 1Kb
+ * */
+static void complete_file(uint8_t *firmwareBuf, uint32_t actualSize)
+{
+	uint32_t i;
+	uint16_t diff = 0;
+
+	diff = FLASH_PAGE_SIZE - (actualSize % FLASH_PAGE_SIZE);
+
+	for(i = actualSize; i < (actualSize + diff); i++)
+	{
+		firmwareBuf[i] = 0xff;
+	}
+	firmwaresize = i; //Store the resulting firmware size
+}
+
 
 void storeFirmwareToTable(uint8_t *FirmwareBuf, char *fileName, uint32_t size)
 {
@@ -411,6 +420,8 @@ void storeFirmwareToTable(uint8_t *FirmwareBuf, char *fileName, uint32_t size)
                 fprintf(file, ", ");
             }
         }
+
+
         fprintf(file, "%s", end);
 
         printSuccess(fileName);
@@ -424,10 +435,6 @@ void storeFirmwareToTable(uint8_t *FirmwareBuf, char *fileName, uint32_t size)
 
     fclose(file);
 }
-
-
-
-
 
 
 

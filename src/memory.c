@@ -1,6 +1,5 @@
 #include "memory.h"
 
-
 char **memReserve(uint32_t raw, uint32_t col)
 {
     uint32_t i;
@@ -68,3 +67,7 @@ uint32_t memory_readUint32(uint8_t *buf, uint8_t index)
     
     return retVal;
 }
+
+
+
+
